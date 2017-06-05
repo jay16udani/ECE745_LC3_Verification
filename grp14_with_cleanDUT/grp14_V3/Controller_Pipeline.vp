@@ -1,0 +1,142 @@
+`include "data_defs.vp"
+module Controller_Pipeline(	clock, reset, IR, bypass_alu_1, bypass_alu_2, bypass_mem_1, bypass_mem_2, complete_data, complete_instr,
+				Instr_dout, NZP, psr, IR_Exec,
+				enable_fetch, enable_decode, enable_execute, enable_writeback, enable_updatePC, 
+				br_taken, mem_state
+				);
+
+   input			clock, reset;	
+   input			complete_data, complete_instr;
+   input [15:0] 		IR, IR_Exec;
+   input [2:0] 			psr, NZP;
+   input [15:0] 		Instr_dout;
+   output			bypass_alu_1, bypass_alu_2, bypass_mem_1, bypass_mem_2;
+   output			enable_fetch, enable_decode, enable_execute, enable_writeback, enable_updatePC;
+   output [1:0] 		mem_state;
+   output			br_taken;
+   
+   reg [1:0] 			mem_state;
+   reg [4:0] 			enables;
+   
+   reg [4:0] 			prev_enables;
+   reg [4:0] 			state, next_state;
+   
+   reg				bypass_alu_1, bypass_alu_2, bypass_mem_1, bypass_mem_2;
+   reg [15:0] 			prev_IR;
+   reg				stall_pipe;
+   reg [2:0] 			bubble_count;
+   wire 			control_instr_dout;
+   wire [4:0] 			enables_temp;
+   reg				inc_count, reset_count;
+   reg				br_taken;
+   
+   reg [1:0] 			mem_ctrl_Cstate, mem_ctrl_Nstate;
+   
+`protected
+    MTI!#=Q<*TrBlD*}EK[UC2$#\Ru5,UY!YqV='[I3Q=|.jmDj_0R~siYw=5A'ivmrV]C<Wz[uW??O
+    {OjVD#8w{v@Xv_X15A{,o~~~D2r"i_EWr+avo}}r=uj~,'{pOxG\|I5$B?oz2@C2\=,xZJ7EzPn<
+    BO1?W>2\li7o@w_3<7}r-e2Axznas]=BUGR>[HJY]O-R<1pR;WrjUA15viIeixN:[iETz$T7oa3Q
+    Q_7#-IsaB3w>.TAQxd3'C}=ri*lYJsTa!m+,+uC{~=IS-57[:Z>QDp<ErY?^E*W-nI_x]~U=+Fi_
+    <$<Q@UQKU>.HO$I^I<C!,1a(Y;oi]#X_s!pmQpRnxusxIu*K5'?[OseE\#2Z^Gl{[0j\2>B7D+bQ
+    l,Ox5JwOGsvmIOhFD,#$eZ>a=>rKZwRXo=+[rI_iY-K'?nmuajW;w+U~i7<}K<wW1$_QjiZX$r@A
+    2z$aBUFer[X73EmntoK>+=;vJ,xuK7~{7r_=zoCX[Jj[u0Wo]fot|-5*QCTX\\o{VDE#_}Cmjqo@
+    WWjB1*=3XvdYAG11_{Uk1^ogPZX,!SA}wH>BBlQ$<RxU'm{pjr'n5{!,1[J\jn_-Gu>wJ\?r;!,k
+    }zlmrvG?X@\r[}:7^3B%WRY}F3$YG[~7J<>W='Ba\eH\$*?;?j]O3vOqQ?jpB+sKr}v1HjV~$B,$
+    ^XsD*~Z[1Q>\1<UKh)[>l1^~E5wC%nG#$C?5[Y@mpNdiUp*Fk5E}b,G]TReT_xV[QjA1X=BkaR=Q
+    sgLwUVWT5)C;*<Yz-#o.f>AX3G*eor@X7rI-~1DRi|Z=?!Q}k,w+B!kw2O^klKHw7Y+HwlPja+1v
+    {v+^J>=!eVeOU@->nSfKGx[sZYvl]~HTxja&ws2AEw--EpTO!a2v]jXu7_eR{]$vzycu<TWW-wW-
+    lj[i+RuvKZ1Vj>^3GeTG+Uss-}GAG=!KaV[Ge{<3=D;Ov3Y0<__@\=-C?$*iUwYQiY7lJIJ^k{~T
+    7]NIxsOOC=w*_U{x_\=&pW;UnV#!orlDj~@TNP1J+xUauJYpAA6mVK58EEE#|)>s2T%<{wQ,2oT+
+    1R[\@3\n<&Rx~a\j{$7l>-ADDQ,l{n-eeDwGKkNke'J6#ThROEVDy2xsa?=u3!=n!3+J*ml\vFx1
+    A\RU}TAG@W4B,aTG,[l]A-m{}svXDi@pW52wAuUli92{-p\7BKiavVRzn_l=-Q[VeOfK]Ew*:,VA
+    !r#Q[9'XB2fxQ#p|>1-T#O3xEr+mp~{vcm==UaXxoiY_i>jo]dt}In<WrOD|}>aoj5'V[rn@j+2>
+    wOT+>pBGGZo~+=XHC7#v+nU=jEjigmEK]]k~m]OujZU^o*>jA5<;m77<EQX;mnBa?W5><|<Ba5Cc
+    ?XuQ7T\ukl?loYaYz]j!=3,O];7OnE*CT1;7e#-w~H[~.D~uzBz5B=7?$$,\+C{BG&/:RsjKv3~W
+    {pUOZle-5T;sQunJez=x:ujOuG^@^Ze=BE]Al]r5>zriH#=*#$@H;eY^Q7ralq2sD[>,Unwsk[[~
+    JK;IUCz@Jlz^TY=?]}31<QDHo3XT]=:hOU}nL_g^W{mK^>wAs5-E;^W1o@XY$$Ws<Wuw[*3;x'}-
+    A>'Hv;^s{l31qFwA+,dGsQ2'lr<q$BTsomJn#s*BoJppRV~a:uT{jPHrVDxerINZUZ#j_-}^@W@o
+    A}2a-xG0e>pKIY'-n>~p(#};<1x7>II[D!V53j%p>AVx'OnP=YaWnV}Y2DD5T}B'7!$*^wYs;nBa
+    KDy^F\3J{5K*Cf5$e*ojIA\=?[=^=H=i7@EwCa?sJeh@XeG\T$^o>[*7E5_'DkmK$EB9QG#;?rBo
+    IG->mSQ_;wB<UW]XTu~V\TxAa{w7]]3G_kj1a@o?ss}z_+E}za;1oB1?~'=W\+TDiJ^e?Of{-Vj!
+    5+le!=XwwEQIw_7~7E1TAYx1mzCx\##gOW,#,XKTa>,D7K\ms}!YA<IOri]J+xpnOB~[sJOJ@s*j
+    W*;QLClpRkQ!T%P2DiD3x5u]n;+}W}=fRY2>:NDZ--ZH]vIR<>^]CJ5H-{!Y5DV,ew#e>V+5r,@X
+    $$<wU+z+-5G2nJP/Dn$[pZr}^p\+27k!@$Wp+$lu-|V6n=Bl11X;p#}~~r^lH[O}l=iXd9>E<vE[
+    ^@@DIm,Q[EC?^GF~w}[GD+kTo^J\2suOuB;RxmDeixU=IIw'Y{+!*Q]iA'I$!Aoo>Ylosn;(k5[C
+    'Q+!n'HU7IrH~U\aW'3opl>1yBv$UBC]Rp'sHn5D7wnz'"?a2-/[@lYu+2@K&f=eAu1iu^pRn5q[
+    -AID3A-lD~<\X@Xr^,J}rr#GZDREin;j[{#uv#}i\jX)<h=z;#=#al,!mj5>_G2O#}Fe#njt\x{7
+    qECR^-[-aO>1uK\7]7S}mU[>}nuZe{Rkaj2DKzi*1},u^*z2v\<oJ$_6<ld^l!@s_O,XEXeuQ2}E
+    uD@FiV}R,Ce_u*RXCG>\BQR~awD[_2aKC5p;f!{uT@vi!~<2?_#mwu]!^}{={Uo'pR[V[^Aau$ZC
+    OTlOxB'l\J^~{RW~R"57=B}WpOC[]+KR>^V\}Z%NEZ}3V~3CapiG81>CooDwp8px<2V2I]#DmQ}D
+    Q3Mgh$,Ao'ZlmmO>p_=p33,;Rl2n-.DsAV^JA;i---FW5=aOo}nQ7KnG#s>}'BoMmnEOsw-$UGQ@
+    '<wT*~-#gGamXG-jmfv=x@VRR}I_TG5TXQ$?Qrr-CQNaO?Ka[#RIk{C:4CZE'DwI>=,;-1Ca>6ko
+    UB{<=<m'a#O~Ov,#x\,H'Am[]ao3lB\;R2[K2O_Bj#~z?2mHrH7-VIb5JA*2VGZ_a+OnRR^^$U3~
+    v5JA5+RsJ=IpXx;CbQ{{R;-rQRW3$-C*~eQ2o<]A#[lJ[d@Tu'vnvKhm-_][~'D}5xI!o1ak{{YV
+    3OU#XB~k7!uHC5[-=U'(eKQ,7#=-:<|J5ma!aHXl>jzgVqeuak_CG+y=x+XO3ej-XpV,\7iE}nzB
+    _uC[?av>'+\Z+]B~5,W=G5IPplol2Q!,^^olsrVI5su1]1I'9KEv]l5v*n<*uVz2I1D7rkp13e>J
+    }I\2H_m23=aVrAE$[]u*=pzz{,u[v3vQOqy+R$GKpA]17A]EW;xC21sBl?xPwUI5^k[1\3$Ef1CD
+    ^&^^e^IT]{,aHCjS}z,oR#[+|plQ[aDR#1>CpOE]wHU17UweA!HDVU'rTm_D<~Gr{V=2BDY>~Avw
+    ~+5Q<UC;}1w;>$XJsT*@2d72T[Ri;^qDw$@==Jv,x[?Y_,wz!CQX^oX,*^Q1-sI+Divpw!AY5jky
+    .$we5xu]@e;GT'A'w3]Ka?]@C[Q+TrWK7*+<1i__vJlAamDk]r)HA$Jh<^kk2==Q{C*37,u51}=5
+    ^/CIaubEaZV>7kU3aZ#kIZmtLXnd'D#Gm{Y-XT$pH(y><mDbwYVrji=249Raa?e$e7p_nOa]pVIe
+    +'vz3QHA^I{G#73rmK-o'V<A+Zb8j,aro7@a2*C~O_W'{T[v,{T]Lwp\7v5uA*nOauBJu6nt%RJ1
+    +*2]vm$7v9Gz3\Iu,u{QH1Ipw{DKm+xD1Csxjs7n{*V;VjW-lDn}}VnUrIR6}2-amEBQ$mY,WtQ'
+    w[3=Z+C?a?-Xo$7<~C|E[R\P\pWaJXCBBma,K{=a=Y@s+{X2feXs_PEWC5s+@3eV?BAaBlmTY<r0
+    jV3]Lp_Y[YQk'!x=-mQuDs$*a[7YYRY1HIa}D?5$Ar]n>aC!Cp-+'mzJu*emwt,wwjl{--]he@^K
+    |Vvi}G?B<Gs2k$=oQhgx1]TL>>5<Up{{J,nrXneBV1pzJ^C{~lo3aI+R#$k[xjB3>{-'pmVTc^Un
+    _SR5!u!RikY'@*QD^G)xCuz2YAw\ux]J*=?]'HeICeCBII7,VVzJEV}'p1wRl{@5n!u$!R?]{X'p
+    Kp5I]iA<a>\ok}X~[z^'<2JuHDRW{Bo!BK]Ro#J>1{!U_Q=3OnC8J[mv3paQ=_X{;5[neYJ2-r3k
+    XA+#xJDos#Qu?aH<DGk\!+{rV{rGWBG2w5CTxF1>J~pn2apVZOe=2Y*DBE=U5zE#~UG{jwEBaVuD
+    ->IA!_VEAlv$!sQi=Ac[KKJ>VE2)e-=2=+ZUp#+?,DjHK5ezDZu$[Q3E>H+JKoI^ZAz1@H[~'52V
+    w1n-i8,~'Jrr5AA'eCTYO\,u3@G;*UgrxEXz5$ToO+$~'ZZCgKe=owl},1z+,h>oQ[A'_>G}r]6N
+    ,$<~O}7UnxJjk8~x,;^{s\BkE9zm3Z]@VpXzuO:8[+~v/A]uEC}!{BOe,H_A*O^u#z[OuVK*VxAr
+    OCQG-HQJu57Ro;+-=xX{{k7v'C>,zGj@Htx?v}!s~D~+G~LwXWJf\vV++B<<w}[kMI^KG]]Uj"$U
+    Y}TnYvpw7+('\]+_UB]@+Qpk\\jO>>]<T;[_!J*&RW~V[->C?A7Rl!_=\w+>DV21g.OD;GI3TYTw
+    eBoGA=G_Z;v-V<-{n!]VIDvYz-Ao5zGk3'.5V*zi<$!43eDQ]$Iu\R3u<-7XQ*]@[p!O'{ev^+Ue
+    YeHv{'E15Tr^rmo]y7Zw<HGED#A}T,5IZHB\Vr^]5HU'zrX+O,AaAjQkA]w\[IujH{7$Y~>,iz\T
+    jl8<>7mY#DB[{B28A*QZ${*e%<=A1IZX\JC]DX^2pr7T?=[n5I{wK1pi>x>U':M|]_OvR@O<v^JO
+    vVD,;oV*$/L^Br[13X{*73[;<]~rpOx-Ga5lR-]wU}AtH5JQm^>Q]-Xo73XUwa*3_@ERL5xG'"Qz
+    ]x=oWoI,QKp}E{_+KA7Kj,JTZu~-JR\C7ps1w@k]YY^jvv^-7H{YV'V*jw,\ju-=As~HW];wa!iQ
+    -HZv<5xIel-,*Zrxnz75r,~AI_#}*ZAlnAF[~OW421'CyvHU{4EZAs%Z55aZjZWeCou}K_G\{[v@
+    [^}DUOpGUsQN*j]p^Z,Ia5=e_@_75[U'9V5}KTlEV;EREusX$4;>I-\3,#mvO#&7s{KvU^wV<Ooz
+    Nn^$KOW1ER~j_3CVEA\nap@-aXnQn+Ve'#GliY_ks*WEwYlz2rYvU-xW}4Jr1CjlEj!7$Y#IVOp2
+    pBG!A^@7'KG;5UY7,Iwr;^;Oou1j{T<\OV]\Ba_T3vvwo^aOx*a*z1<E;Z$Kl[VxC+C1U3luG1?>
+    Wk2zW+3E}Jc?}+1!a]vp5X;a_ioRW>-n_}B5uY^I2AO$Ww[,CJ'z@Cj]]<@A1z3=rT2r!exY_w[P
+    @\=KR+AUBpV;J[KT9<-aHEaORpE#OekvoEgslDrSRR$3U=AVRu^?!'kr<rD'izzH]Z<eTCDih#$K
+    [U7AGj]$@RruOIZ}[#n<xHsKku]G,~}E!/*kXYKR]a~a=^-7E'XA{@m'3o~*,TIk$!m[J1o{-_Ho
+    U>[[VGEI_JXGHXB]7Exz]ImSZ}UZ5i;E+5*ve<O-O_${9,aV7Ko<nIWXDR+}D]vK=*+IOrEx,+1T
+    ?4RU=j<wZo5z+l,,+=Rn$7}17BzOO-GqQXD~Dw*B>{\D*Te-2lBux+_VECR$}~AXeuu@r*uJ=#~v
+    AA-aE]$nH{9W_GB2BKC_pIA8QjR*-l>ZTG}#OlWo+xT#psKX[>^p[w~=V=Ar9Qs@2'vQ1Uz*#P'x
+    ]R+|3Y=*J+n-{_k];pK[;$k-ou$wWEOJZIA>$Bm~^ADzuzJ_J-E*j=jK_a@l*GJ-KaZY^Q+D?T^O
+    1?va+_Gno#pQ5_A#a}mkZ,QAgOT3v#V#Ky5xoiZ+>H5Ewu;+<CJ{,'!lKGT$}7sCB3g\Cvx>'nl+
+    7#7^3nYo}G31#->u}BW:rYVol*wE~Xmp+vw=9t!1mCz{VQkG@QoZ^e>'"sXG>\X7@I'7v__5z<R1
+    +C*in<5@AX-Y~ov$vK'pDj[=CC$v2nY>UA_?Hwzm2uv[E~*?*<G,Zo,Z33E<rW^YkG?Ia$jle}$>
+    -?XT!V-QGk=O~~C\so?n_]GaW;\2+<H;UUBOBLMx]v]jI_aSs#7X7j!wD_X?-n'R)$WA]KV\k[oi
+    {?rWvI~7pD+XRV{X,rBwj]!~]oVU~}[]#-}q{I^m@HJ!Je]A;H!$Gi}poK,AIG+#*kGRwszCRBis
+    wHX!-[C$,ujk3]!U2GsnRD^D$XxD7%G$}I,a]+'3~#4SLn5>--aa^_aHC>B_>^=z,7\T;ieTH>D+
+    !pjp2,^7-VI+x_@R$]C^C<e*^Jo<>{Xo+v1BT3p'=Y^rA<=IAuty>OeQ>^$J4;>EG7z-?v=~pxoU
+    vF2sG+YJpDlwoi'TR1R'W1BBo{2nQ}4OH4A7KVl}v22*B[J'Ez1ZWa/Z_A<W_'{NDsH?wrR=X+pX
+    7U-!\V-$3p*J11}vN{\O!EH**lzo]*+[Y]v;?z2e#sO&?rUW]m^Q;vp#szWYz*w~#1!>^ZD7\pA_
+    n>mjAoXwlR[xjwW_Dhla-31<]~8g&'*-Q@a{W#jor*D;\XRB<,~7]Vx=~r'lYB?K-.vCQ1&52<j~
+    9E]7r**uE,Yp[,1$2-,;=alp;n{BnK'*[hDXDu1+D;,>p\z;ZVi]TQVs'l\@I\$%[aCvksw1seGr
+    eJOljJwrb'JsBo_E!vWn7rbu[$##EVVH5=iO^Y~[WsR92[vsUH1up3V$p{>D%z3U,2Y<3q*$Dx7X
+    sk\$X]Z$*;>wzvnBJzB$uwD@~n|VurGheL!AKGaCwu''D,z~;}o\AkH^2{f<oUB0HxC@;vGey-+J
+    o\rX~esm=Y;G3{U^5RB-C*'>e\Ul}x,3~luCk|?[3rM$_uekI3{z$5>]s1eRvlzeB#7B532}[z;+
+    eK@CV5u|I~{>ZUz-5n!k>j5EUEC]-TC{s,svlAU>eEGAA-Cu;,V-eWK3^]!lzeR^H*~-C>,Q2R-]
+    c-D'uk<HXaX[3l%\}_T$W,m~A;7uIKY\?QH6,xvoDCA1E>G}o^~3cn1T]W{@QA]mswwZRc=}VZw^
+    KE*aGc,JKIUz+JI*+#lK,o{\wY%H[{1}>H}{n,=B2-wp[wm=+zz^CZ?s3VRs#Q5xCz>E7w<U1e_=
+    BK#j7QC41lp-vKX@~D@$b=Ss\oe~C{'jYe>J\*jh?_II;$C[un*r}-!>j!zVek=OuE[EQ{]m+]_o
+    v#5Rs>7wO}=lYQ5IvXYAzBkp[_UJ~E@^q{elpRo>^Zw,u#e2RBQKDBl!X^#ov+,~[1Zrls=#_k>G
+    7Ls\=<Jv;RKeH$mO2E#e];[QmT?T5[dbIKE$WvwTYW_$bOE'3l;=3nAH<q7ao#xlY~7AVZ<|wX\m
+    X,l2\YpG\C<TC5u\jmoeEoxZrnT@!5W[E23V}C{W+xC7ie$W2eRDf$QuI}jBm3*[Am\1'<Y$IiBi
+    J$zK~ToZ$"pA-k~jXH7#}-K$pwUsi,}32vVjaDQDJ+1Aoo7j\{Gwj~'U_rIWEGWV\!YzU>lK33@]
+    Vj}2\@OuY<@'#]eIrTHDvzkxB*G5!Xp^\$QJI+w+pY#I=BYUzTz@1'o<ux)'1#Xfv#na73}~l$n\
+    J]K^82lY#^KGwBY+*Q]{G6rT5wZ+1kY<]KlU7i[%UCBYo\Ouz]#E)<^5$r-+vl!pkqu[Qk4Y'$>@
+    DY]Q3Zxk^,+Er*Ap2_pRCj;?Y2rm_IJ9L*r\J~$k?OzroH_~=\[AGFlIR;'=\*R{sYJausl{H'9<
+    YV1Y=-w?}lr47^6h2_kIdOIpB&Nu-*vQ5?RRj>OD]1K]+=G<B-u2*XmH-!alsWA~V1*Rzul,EHRp
+    @InoS~Aos*kw*Vo{1DCCw#l?Z*pDKHI?7Zz3Db*+G?;}x+V@!u5{u*~C1^*$CrYlKQ21-Hk<{<\X
+    !=${Owe.{7;Jk=jEI3'3BjAn/^T'{mBRYQ/r-w2s!_YF?o<AIu\xpr}~o#{B>'@5z@~=v\W$Y{e;
+    $U_79r1]z}vR\oZ'!CBBEaIR3T_f_Cs7BGI#o?W[=koOEE}E[c
+`endprotected
+
+
+endmodule

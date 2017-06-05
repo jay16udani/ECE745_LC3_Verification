@@ -1,0 +1,37 @@
+`include "data_defs.vp"
+module Fetch(clock, reset, enable_updatePC, enable_fetch, pc, npc_out, instrmem_rd, taddr, br_taken);
+  	input 			clock, reset, br_taken, enable_fetch, enable_updatePC;
+  	input 	[15:0] 	taddr;
+  	//input [3:0] 	state;
+  	output 	[15:0] 	pc, npc_out;   // current and next PC
+  	output 			instrmem_rd;
+	
+  	//reg		[15:0]	npc_out;
+  	reg 	[15:0] 	ipc;        // internal PC
+  	wire 	[15:0] 	muxout;
+`protected
+
+    MTI!#R~G1CB$Y}VwCL:$H!<Q+s7>\iz;7_kC7?[\Zx[Qm}>IO7>|H+^}T[>p]<[>5C7w^u-Q=~BI
+    uY;+]ARs)be1J~$Q^u=+7;@RjlQ,;=Dl2<[j,*#5YXXRk>U1l}>7e@[w}_oP]kXO2$$-2>$YGVu;
+    7_5V=@+kbtB7i1$-ovnj*Q/pxk\U1^[#REa:}xo!c*axm7~^G$7xB<_{#)IGBB?[B37xnag$Z_+v
+    Wm<}G_[\>ZU#aB+7[T]knzprDpm!B*u]RDR5i8;U>BHr[IB<JrpzKp~QEHqln{1^XY]GauGAr-O|
+    *>I~},j_G?S3VRjzTJ[@wOz?D<m>Ro$@eK}ULz;-$[_j]<,O3'yZUG]=V_z72Y$2VQnc>Bnu5{xv
+    :$=XX[r-ai>~s_!{v'QEaEY>*zWKnxGO=t=!@;pm+\P[@V{]!W_=iG>\7X-&W5#u<l7[B?G5l~Wo
+    eRp\Re17#*>Qu{$7{eB[v*5u9?XV\G]*D7K~lUru1Yw^[1A>sNAw3=<*+e}~@T**Hs}+j^^3*Q1I
+    WrDe'V^{p3EmX[?'{?[GA+|vAj!@[,A_zklU{TJfa-z7]-E]Y[T!#IA*]sl~(Rp<[nrY}2pT#rH\
+    _n+H~}kv=pB!#|;_#ak5*?_jk~xV5$B-rX1OQj_:)|Ho}i^*}u^{]lflJG5hsI@x'X2YnU]n@$vT
+    r[<]vaWJGR_rQAl[G7{[GE+mD?+1&]Q@YOi{!5WOk^@$D3E}pyXl]u!avXKCW<!sBAsXVBjA!WZv
+    p+Q_@z1Bz1G-^v_Wnl-E@r"/*H{T7aj,K$'<I"7RiYBbD?pa1DmQ;7
+`endprotected
+  								
+endmodule
+
+
+
+
+
+
+
+
+
+
